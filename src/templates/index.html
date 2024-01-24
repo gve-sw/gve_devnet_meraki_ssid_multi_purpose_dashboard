@@ -1,0 +1,281 @@
+{% extends "masterPage.html" %}
+
+{% block content %}
+<div class="container-fluid base-margin-top">
+    <h5 class="display-5">Wireless Networks Overview</h5>
+    <hr>
+
+    <div class="section">
+        <div class="row">
+            <div class="col-md-6">
+                <!-- Organization Select Form -->
+                <div class="form-group base-margin-bottom">
+                    <div class="form-group__text select">
+                        <select name="organizations_select" id="organizations_select">
+                            <option disabled selected hidden value="">Please choose...</option>
+                            {% for orga in dropdown_content %}
+                            <option value="{{ orga.orgaid }}">
+                                {{ orga.organame }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <label for="organizations_select">Organization:</label>
+                    </div>
+                </div>
+            </div>
+            {% for orga in dropdown_content %}
+            <div id="{{ orga.orgaid }}-col" class="network-select-col">
+                <div id="{{ orga.orgaid }}-select" class="network-select" hidden>
+                    <div class="form-group base-margin-bottom">
+                        <div class="form-group__text select">
+                            <select name="networks_select" class="networks" id="networks_select">
+                                <option disabled selected hidden value="">Please choose...</option>
+                                {% for network in orga.networks %}
+                                <option value="{{ network.networkid }}">
+                                    {{ network.networkname }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <label for="networks_select">Network</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-lg-8" id="loading-panel"></div>
+    </div>
+    <div class="section">
+        <div id="ap_table_title"></div>
+        <div class="responsive-table" id="ap_table_locator"></div>
+    </div>
+    <div class="section">
+        <div id="ssid_table_title"></div>
+        <div class="responsive-table" id="ssid_table_locator"></div>
+    </div>
+
+</div>
+
+<script>
+    // Show content based on selected organization
+    $("#organizations_select").change(function () {
+        var selectedOrg = $(this).val();
+        $(".network-select").hide();
+        $(".network-select-col").removeClass("col-md-6");
+
+        // Show the selected network-select div
+        var $selectedNetworkDiv = $(".network-select[id='" + selectedOrg + "-select']");
+        $selectedNetworkDiv.show();
+
+         // Dynamically set col-md-6 class
+        var $selectedNetworkCol = $(".network-select-col[id='" + selectedOrg + "-col']");
+        $selectedNetworkCol.addClass("col-md-6");
+    });
+
+      // Trigger API call when network dropdown changes
+    $(".networks").change(function () {
+        // Get the selected organization and network values
+        var selectedOrg = $("#organizations_select").val();
+        var selectedNetwork = $(this).val();
+
+        // display loading panel
+        var html = '<div class="progressbar" data-percentage="0" id="progressBar"><div class="progressbar__fill"></div><div class="progressbar__label">0%</div></div>';
+        $('#loading-panel').html(html);
+
+        // Clear Any Existing Tables
+        $('#ap_table_title').html('');
+        $('#ap_table_locator').html('');
+        $('#ssid_table_title').html('');
+        $('#ssid_table_locator').html('');
+
+        // Start checking the progress
+        updateProgressBar(0);
+        setTimeout(checkProgress, 500);
+
+        // Make the AJAX call with the selected organization and network values
+        $.ajax({
+            url: "/wireless_overview",
+            method: "GET",
+            data: {
+                organizations_select: selectedOrg,
+                networks_select: selectedNetwork
+            },
+            success: function (data) {
+                // Force Progress to 100
+                updateProgressBar(100)
+
+                // Handle the successful response and update the HTML tables
+                build_table(data['aps'], "ap_table")
+                build_table(data['ssids'], "ssid_table")
+            },
+            error: function (error) {
+                // Handle errors
+                console.error("Error:", error);
+            }
+        });
+    });
+
+    function build_table(data, table_name) {
+        // Construct the HTML for the table
+        if (table_name === "ap_table") {
+            var htmlTable = '<table class="table table--lined table--wrapped" id="apDeviceTable">' +
+                '    <thead>' +
+                '        <tr>' +
+                '            <th class="hidden-md-down">Device Name</th>' +
+                '            <th class="hidden-md-down">Serial Number</th>' +
+                '            <th class="hidden-md-down">Model</th>' +
+                '            <th class="hidden-md-down">Tags</th>' +
+                '        </tr>' +
+                '    </thead>' +
+                '    <tbody>';
+
+            // Add rows to the table based on the data
+            data.forEach(function (device) {
+                var deviceStatusClass = 'text-light';
+                if (device.status === 'online') {
+                    deviceStatusClass = 'text-success';
+                } else if (device.status === 'offline') {
+                    deviceStatusClass = 'text-danger';
+                } else if (device.status === 'alerting') {
+                    deviceStatusClass = 'text-warning';
+                }
+
+                htmlTable += '        <tr>' +
+                    '            <td>' +
+                    '                <span class="icon-accesspoint-outline icon-size-20 half-margin-right ' + deviceStatusClass + '"></span>' +
+                    '                <span>' + device.name + '</span>' +
+                    '            </td>' +
+                    '            <td class="hidden-md-down">' + device.serial + '</td>' +
+                    '            <td class="hidden-md-down">' + device.model + '</td>' +
+                    '            <td class="hidden-md-down">' + device.tags + '</td>' +
+                    '        </tr>';
+            });
+
+            // Close the table body and table tag
+            htmlTable += '    </tbody>' +
+                '</table>';
+
+            // Set the HTML content of the ap_table div (and title)
+            $('#ap_table_title').html('<h6 class="display-6">Access Points</h6><hr>');
+            $('#ap_table_locator').html(htmlTable);
+
+            $('#apDeviceTable').DataTable({
+                columnDefs: [
+                    {width: '25%', targets: 0},
+                    {width: '25%', targets: 1},
+                    {width: '25%', targets: 2},
+                    {width: '25%', targets: 3}
+                ],
+                createdRow: function (row, data, dataIndex) {
+                    // Add a class or style to the leftmost cell in each row
+                    $(row).find('td:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+                },
+                headerCallback: function (thead, data, start, end, display) {
+                    // Add a class or style to the header cell of the leftmost column
+                    $(thead).find('th:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+                }
+            });
+        } else {
+            let htmlTable = '<table class="table table--lined table--wrapped" id="ssidTable">' +
+        '    <thead>' +
+        '        <tr>' +
+                    '<th class="hidden-md-down">Name</th>' +
+                    '<th class="hidden-md-down">Enabled</th>' +
+                    '<th class="hidden-md-down">Auth Mode</th>' +
+                    '<th class="hidden-md-down">Encryption Mode</th>' +
+        '        </tr>' +
+        '    </thead>' +
+        '    <tbody>';
+
+            // Add rows to the table based on the data
+            data.forEach(function (ssid) {
+                var ssidStatusClass = 'text-light';
+                if (ssid.enabled === true) {
+                    ssidStatusClass = 'text-success';
+                }
+
+                htmlTable += '        <tr>' +
+                    '            <td class="hidden-md-down">' + ssid.name + '</td>' +
+                    '            <td>' +
+                    '                <span class="icon-wifi icon-size-20 half-margin-right ' + ssidStatusClass + '"></span>' +
+                    '                <span>' + ssid.enabled + '</span>' +
+                    '            </td>' +
+                    '            <td class="hidden-md-down">' + ssid.authMode + '</td>' +
+                    '            <td class="hidden-md-down">' + ssid.encryptionMode + '</td>' +
+                    '        </tr>';
+            });
+
+            // Close the table body and table tag
+            htmlTable += '    </tbody>' +
+                '</table>';
+
+            // Set the HTML content of the ap_table div (and title)
+            $('#ssid_table_title').html('<h6 class="display-6">SSIDs</h6><hr>');
+            $('#ssid_table_locator').html(htmlTable);
+
+            $('#ssidTable').DataTable({
+                columnDefs: [
+                    {width: '25%', targets: 0},
+                    {width: '25%', targets: 1},
+                    {width: '25%', targets: 2},
+                    {width: '25%', targets: 3}
+                ],
+                createdRow: function (row, data, dataIndex) {
+                    // Add a class or style to the leftmost cell in each row
+                    $(row).find('td:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+                },
+                headerCallback: function (thead, data, start, end, display) {
+                    // Add a class or style to the header cell of the leftmost column
+                    $(thead).find('th:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+                },
+                order: [[1, 'desc']]
+            });
+
+            // Color ssid names which match a tag (most likely synchronized)
+            var tagsColumnData = $('#apDeviceTable').DataTable().column(3).data().toArray();
+
+            // You can iterate through the values and check if a specific name is within the list
+            $('#ssidTable').DataTable().rows().every(function() {
+                var rowData = this.data(); // Get data of the current row
+                var nameInTags = tagsColumnData.includes(rowData[1]);
+
+                if (nameInTags) {
+                    // Add your styling to the current row
+                    $(this.node()).addClass('text-weight-700');
+                }
+            });
+        }
+    }
+
+    // Function to update the progress bar
+    function updateProgressBar(progress) {
+        const progressBar = document.getElementById('progressBar');
+        const progressBarLabel = progressBar.querySelector('.progressbar__label');
+
+        progressBar.setAttribute('data-percentage', progress);
+        progressBarLabel.textContent = `${progress}%`;
+
+        if (progress === 100) {
+            // If progress is 100%, wait for a couple of seconds and then remove the progress bar
+            setTimeout(() => {
+                $('#loading-panel').empty();
+            }, 500); // Adjust the timeout value as needed
+        }
+    }
+
+    // Function to make an asynchronous request and update the progress bar
+    async function checkProgress() {
+        const response = await fetch('/progress');
+        const data = await response.json();
+
+        const flooredProgress = Math.floor(data.progress);
+
+        updateProgressBar(flooredProgress);
+
+        // Continue checking progress unless it has reached 100%
+        if (data.progress < 100) {
+            setTimeout(checkProgress, 1000);
+        }
+    }
+</script>
+{%  endblock %}

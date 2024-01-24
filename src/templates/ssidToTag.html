@@ -1,0 +1,311 @@
+{% extends "masterPage.html" %}
+
+{% block content %}
+
+<div class="container-fluid base-margin-top">
+    <h5 class="display-5">SSID to Tag Mapping</h5>
+    <hr>
+    <div class="row">
+        <!-- Left Rail -->
+        <div class="col-xl-3 col-md-4">
+            <div class="panel panel--loose panel--raised base-margin-bottom">
+            <h2 class="subtitle">Step 1: Find SSID to Tag Mappings</h2>
+            <div class="section">
+            <form action="/ssid_mapping" method="POST" id="mappingForm">
+                <!-- Organization Select Form -->
+                <div class="form-group base-margin-bottom">
+                    <div class="form-group__text select">
+                        <select data-placeholder="Choose an Organization..."  class="chosen-select" name="organizations_select" id="organizations_select" multiple>
+                            {% for orga in dropdown_content %}
+                            <option value="{{ orga.orgaid }}">
+                                {{ orga.organame }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                {% for orga in dropdown_content %}
+                <div id="{{ orga.orgaid }}-col" class="network-select-col">
+                    <div id="{{ orga.orgaid }}-select" class="network-select" hidden>
+                        <div class="form-group base-margin-bottom">
+                            <div class="form-group__text select">
+                                <select data-placeholder="Choose Destination Networks..." name="networks_select" class="networks chosen-select" id="networks_select" multiple tabindex="4">
+                                    <option value="select_all">Select All</option>
+                                    {% for network in orga.networks %}
+                                    <option value="{{ network.networkid }}">
+                                        {{ network.networkname }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <input type="hidden" name="form_type" value="mapping_form">
+
+                <!-- Button area-->
+                <div class="row">
+                    <div class="col-md-6">
+                        <button class="btn btn-primary" type="button" id="submitButton" disabled>Find Mappings</button>
+                    </div>
+                    <div class="col-lg-6" id="loading-panel-1"></div>
+                </div>
+            </form>
+            </div>
+            </div>
+        </div>
+        <!-- Middle Rail -->
+        <div class="col-xl-6 col-md-4">
+            <div class="panel panel--loose panel--raised base-margin-bottom">
+            <h2 class="subtitle">Current Mappings</h2>
+            <div class="section">
+                <div class="responsive-table">
+                    <table class="table table--lined table--wrapped" id="mappingTable">
+                        <thead>
+                            <tr>
+                                <th class="hidden-md-down">SSID Name</th>
+                                <th class="hidden-md-down">Source Network Name</th>
+                                <th class="hidden-md-down">Enabled</th>
+                                <th class="hidden-md-down">Auth Mode</th>
+                                <th class="hidden-md-down">Destination Network Name</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                              <!-- Dynamically populate with javascript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            </div>
+        </div>
+        <!-- Right Rail -->
+        <div class="col-xl-3 col-md-4">
+            <div class="panel panel--loose panel--raised base-margin-bottom">
+                <h2 class="subtitle">Step 2: Synchronize Mappings</h2>
+                <div class="section">
+                <form action="/ssid_to_tag" method="POST" name="synchronize">
+                    <!-- Hidden Org and Network field to pass data from the first form -->
+                    <input type="hidden" name="organizations_select">
+                    <input type="hidden" name="networks_select">
+
+                    <!-- Submit Button -->
+                    <div class="section">
+                        <button class="btn btn-primary" type="submit" id="synchronizeButton" disabled>Synchronize Mappings</button>
+                    </div>
+                    <div class="col-lg-12" id="loading-panel-2"></div>
+                </form>
+                </div>
+            </div>
+            <!--Alert for success message-->
+            {% if success %}
+            <div class="alert alert--success" id="success-alert">
+                <div class="alert__message">Successfully Synchronized SSID Mappings. Please check errors (if applicable).</div>
+            </div>
+
+            <script>
+                // Get a reference to the alert element
+                const successAlert = document.getElementById('success-alert');
+
+                // Function to hide the alert after a specified delay (in milliseconds)
+                function hideAlert() { successAlert.style.display = 'none';}
+                successAlert.style.display = 'block';
+
+                // Set a timeout to hide the alert
+                setTimeout(hideAlert, 10000); // Adjust the delay as needed
+            </script>
+            {% endif %}
+
+            <!--Alert for error message (if the error list is non-empty) -->
+            {% if display_errors|length > 0 %}
+                {% for network, errors in display_errors.items() %}
+                <div class="alert alert--danger" id="failure-alert">
+                    <span class="icon-attention"></span>
+                    <div class="alert__message">
+                        <span>{{network}}</span>
+                        <hr>
+                        {% for error in errors %}
+                        <p>- {{error}}</p>
+                        {% endfor %}
+                    </div>
+                    <a href="javascript:;" class="alert__close icon-close"></a>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+   $(document).ready( function () {
+       $("#organizations_select").chosen({max_selected_options: 1});
+
+       // Show content based on selected organization
+       $("#organizations_select").change(function () {
+           var selectedOrg = $(this).val();
+           $(".network-select").hide();
+           $(".chosen-toggle").hide();
+
+           $(".networks").val([]); // Clear selected values
+           $(".networks").trigger("chosen:updated"); // Trigger an update
+
+           // Show the selected network-select div
+           var $selectedNetworkDiv = $(".network-select[id='" + selectedOrg + "-select']");
+           $selectedNetworkDiv.show();
+
+           $selectedNetworkDiv.find('.chosen-select').chosen();
+
+           var $selectedNetworkSelectAll = $(".chosen-toggle[id='" + selectedOrg + "-select-all']");
+           $selectedNetworkSelectAll.show();
+
+           // Update the submit button when the organization changes
+           updateSubmitButton();
+       });
+
+       // Handle the "Select All" button click
+        $(".networks").each(function() {
+            $(this).change(function () {
+                var selectedValue = $(this).val();
+
+                // Check if "Select All" is selected
+                if (selectedValue && selectedValue.includes("select_all")) {
+                    $(this).find("option[value='select_all']").prop("selected", false);
+
+                    // Select all options except the "Select All" option
+                    $(this).find("option[value!='select_all']").prop("selected", true);
+                    // Update Chosen
+                    $(this).trigger("chosen:updated");
+                }
+            })
+        });
+
+        // Enable/disable the submit button based on Chosen select changes
+        $(".networks").change(updateSubmitButton);
+
+        $('#mappingTable').DataTable({
+            columnDefs: [
+                { width: '20%', targets: 0 },
+                { width: '25%', targets: 1 },
+                { width: '15%', targets: 2 },
+                { width: '15%', targets: 3 },
+                { width: '25%', targets: 4 }
+            ],
+            createdRow: function(row, data, dataIndex) {
+                // Add a class or style to the leftmost cell in each row
+                $(row).find('td:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+            },
+            headerCallback: function(thead, data, start, end, display) {
+                // Add a class or style to the header cell of the leftmost column
+                $(thead).find('th:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+            }
+        });
+
+        $('#submitButton').on('click', function () {
+            // display loading panel
+            var html = '<div class="progressbar" data-percentage="0" id="progressBar"><div class="progressbar__fill"></div><div class="progressbar__label">0%</div></div>';
+            $('#loading-panel-1').html(html);
+
+            // Start checking the progress
+            updateProgressBar(0);
+            setTimeout(checkProgress, 1000);
+
+            $.ajax({
+                type: 'POST',
+                url: '/ssid_mapping',
+                data: $('#mappingForm').serialize(),  // Serialize form data
+                success: function (data) {
+                    var dataTable = $("#mappingTable").DataTable();
+
+                    // Clear existing table content
+                    dataTable.clear()
+
+                    // Iterate through the data and append rows to the table
+                    for (let i = 0; i < data.length; i++) {
+                        dataTable.row.add([
+                            (data[i].enabled ? '<span class="icon-wifi icon-size-20 half-margin-right text-success"></span>' : '<span class="icon-wifi icon-size-20 half-margin-right text-light"></span>') + data[i].ssid_name,
+                            data[i].source_network,
+                            (data[i].enabled ? 'Yes' : 'No'),
+                            data[i].authMode,
+                            '<span class="icon-ethernet icon-size-20 half-margin-right text-success"></span>' + data[i].dest_network
+                        ]).draw(false); // 'draw' with 'false' to retain the current page
+                    }
+                    // Enable the submit button if data is returned
+                    $("#synchronizeButton").prop("disabled", !data || data.length === 0);
+                },
+                error: function (error) {
+                    // Handle errors
+                    console.error('Error submitting form', error);
+                }
+            });
+        })
+        $("#synchronizeButton").on("click", function (e) {
+            e.preventDefault();  // Prevent the default form submission
+
+            // display loading panel
+            var html = '<div class="progressbar" data-percentage="0" id="progressBar"><div class="progressbar__fill"></div><div class="progressbar__label">0%</div></div>';
+            $('#loading-panel-2').html(html);
+
+            // Start checking the progress
+            updateProgressBar(0);
+            setTimeout(checkProgress, 1000);
+
+            // Get selected values from the Chosen dropdown
+            var selectedOrg = $("#organizations_select").val();
+            var selectedNetworks = $(".network-select-col[id='" + selectedOrg + "-col'] #networks_select").val();
+
+            // Update the hidden inputs in the second form
+            $("input[name='organizations_select']").val(selectedOrg);
+            $("input[name='networks_select']").val(selectedNetworks);
+
+            // Submit the form
+            document.synchronize.submit();
+        });
+   })
+
+    function updateSubmitButton() {
+        var selectedNetworks = $(".networks").map(function () {
+            return $(this).val();
+        }).get();
+
+        // Get the currently selected organization
+        var selectedOrg = $("#organizations_select").val();
+
+        // Enable the button if at least one network is selected for the current organization, disable otherwise
+        $("#submitButton").prop("disabled", !selectedNetworks.some(value => value && value.length > 0 && selectedOrg && selectedOrg.length > 0));
+    }
+
+   // Function to update the progress bar
+    function updateProgressBar(progress) {
+        const progressBar = document.getElementById('progressBar');
+        const progressBarLabel = progressBar.querySelector('.progressbar__label');
+
+        progressBar.setAttribute('data-percentage', progress);
+        progressBarLabel.textContent = `${progress}%`;
+
+        if (progress === 100) {
+            // If progress is 100%, wait for a couple of seconds and then remove the progress bar
+            setTimeout(() => {
+                $('#loading-panel-1').empty();
+                $('#loading-panel-2').empty();
+            }, 500); // Adjust the timeout value as needed
+        }
+    }
+
+    // Function to make an asynchronous request and update the progress bar
+    async function checkProgress() {
+        const response = await fetch('/progress');
+        const data = await response.json();
+
+        // Floor the progress value
+        const flooredProgress = Math.floor(data.progress);
+
+        updateProgressBar(flooredProgress);
+
+        // Continue checking progress unless it has reached 100%
+        if (data.progress < 100) {
+            setTimeout(checkProgress, 1000);
+        }
+    }
+</script>
+{%  endblock %}

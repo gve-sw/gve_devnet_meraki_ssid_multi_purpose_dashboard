@@ -1,0 +1,14 @@
+version: "3.5"
+
+services:
+  gve_devnet_meraki_ssid_multi_purpose_dashboard:
+    image: ghcr.io/gve-sw/gve_devnet_meraki_ssid_multi_purpose_dashboard:latest
+#    build: .
+    container_name: gve_devnet_meraki_ssid_multi_purpose_dashboard
+    environment:
+      - MERAKI_API_KEY=${MERAKI_API_KEY}
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./src/logs:/app/logs
+    restart: "always"

@@ -1,0 +1,461 @@
+{% extends "masterPage.html" %}
+
+{% block content %}
+
+<div class="container-fluid base-margin-top">
+    <h5 class="display-5">Configure SSIDs</h5>
+    <hr>
+    <div class="row">
+        <!-- Left Rail -->
+        <div class="col-xl-3 col-md-4">
+            <div class="panel panel--loose panel--raised base-margin-bottom">
+            <h2 class="subtitle">Step 1: Select Context</h2>
+            <div class="section">
+                <form action="/ssids" method="POST" id="ssidForm">
+                    <!-- Organization Select Form -->
+                    <div class="form-group base-margin-bottom">
+                        <div class="form-group__text select">
+                            <select data-placeholder="Choose an Organization..."  class="chosen-select" name="organizations_select" id="organizations_select" multiple>
+                                {% for orga in dropdown_content %}
+                                <option value="{{ orga.orgaid }}">
+                                    {{ orga.organame }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    {% for orga in dropdown_content %}
+                    <div id="{{ orga.orgaid }}-col" class="network-select-col">
+                        <div id="{{ orga.orgaid }}-select" class="network-select" hidden>
+                            <div class="form-group base-margin-bottom">
+                                <div class="form-group__text select">
+                                    <select data-placeholder="Choose Destination Networks..." name="networks_select" class="networks chosen-select" id="networks_select" multiple tabindex="4">
+                                        <option value="select_all">Select All</option>
+                                        {% for network in orga.networks %}
+                                        <option value="{{ network.networkid }}">
+                                            {{ network.networkname }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+
+                    <input type="hidden" name="form_type" value="mapping_form">
+
+                    <!-- Button area-->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-primary" type="button" id="submitButton" disabled>Submit</button>
+                        </div>
+                        <div class="col-lg-6" id="loading-panel-1"></div>
+                    </div>
+                </form>
+            </div>
+            </div>
+        </div>
+        <!-- Middle Rail -->
+        <div class="col-xl-6 col-md-4">
+            <div class="panel panel--loose panel--raised base-margin-bottom">
+            <h2 class="subtitle">Step 2: Select SSIDs</h2>
+            <div class="section">
+                <div class="responsive-table">
+                    <table class="table table--lined table--wrapped" id="ssidTable">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <label class="checkbox">
+                                        <input type="checkbox" id="selectAllCheckbox">
+                                        <span class="checkbox__input"></span>
+                                    </label>
+                                </th>
+                                <th class="hidden-md-down">SSID Name</th>
+                                <th class="hidden-md-down">Network Name</th>
+                                <th class="hidden-md-down">Number</th>
+                                <th class="hidden-md-down">Enabled</th>
+                                <th class="hidden-md-down">Auth Mode</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                              <!-- Dynamically populate with javascript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            </div>
+        </div>
+        <!-- Right Rail -->
+        <div class="col-xl-3 col-md-4">
+            <div class="panel panel--loose panel--raised base-margin-bottom">
+                <h2 class="subtitle">Step 3: Modify SSIDs</h2>
+                <div class="section">
+                <form action="/configure_ssid" method="POST" id="configureSSIDForm">
+                        <!-- Action Dropdown -->
+                        <div class="section">
+                            <div class="form-group base-margin-bottom">
+                                <div class="subheader">SSID State</div>
+                                <div class="form-group form-group--inline base-margin-bottom">
+                                    <label class="radio">
+                                        <input type="radio" checked name="ssid_state" value="enabled">
+                                        <span class="radio__input"></span>
+                                        <span class="radio__label">Enabled</span>
+                                    </label>
+                                </div>
+                                <div class="form-group form-group--inline base-margin-bottom">
+                                    <label class="radio">
+                                        <input type="radio" name="ssid_state" value="disabled">
+                                        <span class="radio__input"></span>
+                                        <span class="radio__label">Disabled</span>
+                                    </label>
+                                </div>
+
+                                <div class="form-group__text">
+                                    <input id="ssid-name" type="text" name="ssid_name">
+                                    <label for="ssid-name">SSID Name</label>
+                                </div>
+                                <div class="form-group__help half-margin-bottom">
+                                    <span>Leave 'Blank' to keep Original Name</span>
+                                </div>
+                                <div class="form-group__text select base-margin-bottom">
+                                    <select id="auth-select" name="auth" onfocus="showOriginalText('Start Demo')">
+                                        <option value="-- Existing --" selected>-- Existing --</option>
+                                        <option value="open" >Open</option>
+                                        <option value="psk">PSK</option>
+                                    </select>
+                                    <label for="auth-select">Auth Mode</label>
+                                </div>
+                                <div class="form-group__text base-margin-bottom" id="password-field" style="display:none;">
+                                    <input id="input-type-password" type="text" name="password">
+                                    <label for="input-type-password">SSID Password</label>
+                                </div>
+                                <div class="form-group__text select base-margin-bottom" id="enc-field" style="display:none;">
+                                    <select id="enc-select" name="encryption">
+                                        <option value="wpa">WPA</option>
+                                        <option value="wep">WEP</option>
+                                    </select>
+                                    <label for="enc-select">Auth Mode</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <div class="section base-margin-bottom">
+                            <button class="btn btn-primary" type="button" id="modifyButton" disabled>Modify SSIDs</button>
+                        </div>
+
+                        <div class="col-lg-12" id="loading-panel-2"></div>
+                    </form>
+                </div>
+            </div>
+
+            <!--Alert for success message-->
+            {% if success %}
+                <div class="alert alert--success" id="success-alert">
+                    <div class="alert__message">Successfully Modified SSIDs. Please check errors (if applicable).</div>
+                </div>
+
+                <script>
+                    // Get a reference to the alert element
+                    const successAlert = document.getElementById('success-alert');
+
+                    // Function to hide the alert after a specified delay (in milliseconds)
+                    function hideAlert() { successAlert.style.display = 'none';}
+                    successAlert.style.display = 'block';
+
+                    // Set a timeout to hide the alert
+                    setTimeout(hideAlert, 10000); // Adjust the delay as needed
+                </script>
+            {% endif %}
+
+            <!--Alert for error message (if the error list is non-empty) -->
+            {% if display_errors|length > 0 %}
+                {% for network, errors in display_errors.items() %}
+                <div class="alert alert--danger" id="failure-alert">
+                    <span class="icon-attention"></span>
+                    <div class="alert__message">
+                        <span>{{network}}</span>
+                        <hr>
+                        {% for error in errors %}
+                        <p>- {{error}}</p>
+                        {% endfor %}
+                    </div>
+                    <a href="javascript:;" class="alert__close icon-close"></a>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+ <script type=text/javascript>
+    // styling for the online status of the SSIDS
+    $(document).ready(function() {
+        $("#organizations_select").chosen({max_selected_options: 1});
+
+        // Show content based on selected organization
+        $("#organizations_select").change(function () {
+            var selectedOrg = $(this).val();
+            $(".network-select").hide();
+            $(".chosen-toggle").hide();
+
+            $(".networks").val([]); // Clear selected values
+            $(".networks").trigger("chosen:updated"); // Trigger an update
+
+            // Show the selected network-select div
+            var $selectedNetworkDiv = $(".network-select[id='" + selectedOrg + "-select']");
+            $selectedNetworkDiv.show();
+
+            $selectedNetworkDiv.find('.chosen-select').chosen();
+
+            var $selectedNetworkSelectAll = $(".chosen-toggle[id='" + selectedOrg + "-select-all']");
+            $selectedNetworkSelectAll.show();
+
+            // Update the submit button when the organization changes
+            updateSubmitButton();
+        });
+
+        // Handle the "Select All" button click
+        $(".networks").each(function () {
+            $(this).change(function () {
+                var selectedValue = $(this).val();
+
+                // Check if "Select All" is selected
+                if (selectedValue && selectedValue.includes("select_all")) {
+                    $(this).find("option[value='select_all']").prop("selected", false);
+
+                    // Select all options except the "Select All" option
+                    $(this).find("option[value!='select_all']").prop("selected", true);
+                    // Update Chosen
+                    $(this).trigger("chosen:updated");
+                }
+            })
+        });
+
+        // Enable/disable the submit button based on Chosen select changes
+        $(".networks").change(updateSubmitButton);
+
+        var table = $('#ssidTable').DataTable({
+            columnDefs: [
+                {
+                    targets: 0, // Target the first column (checkbox column)
+                    searchable: false, // Disable searching for this column
+                    orderDataType: "dom-checkbox"
+                },
+                {width: '30%', targets: 1},
+                {width: '30%', targets: 2},
+                {width: '10%', targets: 3},
+                {width: '15%', targets: 4},
+                {width: '15%', targets: 5}
+            ],
+            createdRow: function (row, data, dataIndex) {
+                // Add a class or style to the leftmost cell in each row
+                $(row).find('td:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+            },
+            headerCallback: function (thead, data, start, end, display) {
+                // Add a class or style to the header cell of the leftmost column
+                $(thead).find('th:eq(0)').css('padding-left', '10px'); // Adjust the padding value as needed
+            },
+            search: {
+                regex: true, // Enable regular expression searching
+                smart: false, // Disable smart searching
+                caseInsensitive: true // Make the search case-insensitive
+            },
+            initComplete: function () {
+                // Apply exact match search for specific columns
+                this.api().columns([1, 2, 3, 4, 5]).every(function () {
+                    var column = this;
+                    $(column.footer()).find('input').on('keyup change clear', function () {
+                        if (!this.value) return;
+                        column
+                            .search('^' + this.value + '$', true, false)
+                            .draw();
+                    });
+                });
+            }
+        });
+
+        // Track the state of the "Select All" checkbox
+        var selectAllChecked = false;
+
+        // Handle click event on "Select All" checkbox
+        $('#ssidTable thead th input[type="checkbox"]').on('click', function () {
+            selectAllChecked = !selectAllChecked;
+            var isSearchActive = table.search() !== '';
+
+            if (isSearchActive) {
+                // If search is active, select all visible rows only
+                table.rows({ search: 'applied' }).every(function () {
+                    var checkBox = $(this.node()).find('td:eq(0) input[type="checkbox"]');
+                    checkBox.prop('checked', selectAllChecked);
+                    }
+                );
+            } else {
+                // If no search, select all rows
+                table.rows().every(function () {
+                    var checkBox = $(this.node()).find('td:eq(0) input[type="checkbox"]');
+                    checkBox.prop('checked', selectAllChecked);
+                });
+            }
+        });
+
+        $('#submitButton').on('click', function () {
+            // display loading panel
+            var html = '<div class="progressbar" data-percentage="0" id="progressBar"><div class="progressbar__fill"></div><div class="progressbar__label">0%</div></div>';
+            $('#loading-panel-1').html(html);
+
+            // Start checking the progress
+            updateProgressBar(0);
+            setTimeout(checkProgress, 1000);
+
+            $.ajax({
+                type: 'POST',
+                url: '/ssids',
+                data: $('#ssidForm').serialize(),  // Serialize form data
+                success: function (data) {
+                    var dataTable = $("#ssidTable").DataTable();
+
+                    // Clear existing table content
+                    dataTable.clear()
+
+                    // Iterate through the data and append rows to the table
+                    for (let i = 0; i < data.length; i++) {
+                        dataTable.row.add([
+                            '<td><label class="checkbox"><input type="checkbox"><span class="checkbox__input"></span></label></td>',
+                            (data[i].enabled ? '<span class="icon-wifi icon-size-20 half-margin-right text-success"></span>' : '<span class="icon-wifi icon-size-20 half-margin-right text-light"></span>') + data[i].ssid_name,
+                            data[i].net_name,
+                            data[i].number,
+                            (data[i].enabled ? 'Yes' : 'No'),
+                            data[i].authMode
+                        ]).draw(false); // 'draw' with 'false' to retain the current page
+                    }
+                    // Enable the submit button if data is returned
+                    $("#modifyButton").prop("disabled", !data || data.length === 0);
+                },
+                error: function (error) {
+                    // Handle errors
+                    console.error('Error submitting form', error);
+                }
+            });
+        })
+        $("#modifyButton").on("click", function (e) {
+            e.preventDefault();  // Prevent the default form submission
+
+            // display loading panel
+            var html = '<div class="progressbar" data-percentage="0" id="progressBar"><div class="progressbar__fill"></div><div class="progressbar__label">0%</div></div>';
+            $('#loading-panel-2').html(html);
+
+            // Start checking the progress
+            updateProgressBar(0);
+            setTimeout(checkProgress, 1000);
+
+            // Gather data from all tables
+            var data = [];
+
+            $('#ssidTable').DataTable().rows().every(function (rowIdx, tableLoop, rowLoop) {
+                var checkBox = $(this.node()).find('td:eq(0) input[type="checkbox"]');
+
+                // Only send checked rows
+                if (checkBox.prop('checked')) {
+                    var ssidName = this.data()[1];
+                    var netName = this.data()[2];
+                    var number = this.data()[3];
+                    var enabled = this.data()[4];
+                    var authMode = this.data()[5];
+
+                    data.push({
+                        ssidName: ssidName,
+                        netName: netName,
+                        number: number,
+                        enabled: enabled,
+                        authMode: authMode
+                    });
+                }
+            });
+
+            // Send data to the Flask route using AJAX
+            $.ajax({
+                url: '/configure_ssid',
+                type: 'POST',
+                data: {
+                    table_data: JSON.stringify(data),
+                    form_data: $('#configureSSIDForm').serialize()
+                },
+                success: function(response) {
+                    // redirect to reload the page (and reflect changes)
+                    window.location.href = response.redirect_url;
+                },
+            });
+        });
+    });
+
+    function updateSubmitButton() {
+        var selectedNetworks = $(".networks").map(function () {
+            return $(this).val();
+        }).get();
+
+        // Get the currently selected organization
+        var selectedOrg = $("#organizations_select").val();
+
+        // Enable the button if at least one network is selected for the current organization, disable otherwise
+        $("#submitButton").prop("disabled", !selectedNetworks.some(value => value && value.length > 0 && selectedOrg && selectedOrg.length > 0));
+    }
+
+    // Function to update the progress bar
+    function updateProgressBar(progress) {
+        const progressBar = document.getElementById('progressBar');
+        const progressBarLabel = progressBar.querySelector('.progressbar__label');
+
+        progressBar.setAttribute('data-percentage', progress);
+        progressBarLabel.textContent = `${progress}%`;
+
+        if (progress === 100) {
+            // If progress is 100%, wait for a couple of seconds and then remove the progress bar
+            setTimeout(() => {
+                $('#loading-panel-1').empty();
+                $('#loading-panel-2').empty();
+            }, 500); // Adjust the timeout value as needed
+        }
+    }
+
+    // Function to make an asynchronous request and update the progress bar
+    async function checkProgress() {
+        const response = await fetch('/progress');
+        const data = await response.json();
+
+        // Floor the progress value
+        const flooredProgress = Math.floor(data.progress);
+
+        updateProgressBar(flooredProgress);
+
+        // Continue checking progress unless it has reached 100%
+        if (flooredProgress < 100) {
+            setTimeout(checkProgress, 1000);
+        }
+    }
+
+document.addEventListener("DOMContentLoaded", function () {
+    // Get references to the select element and the password input element
+    const authSelect = document.getElementById("auth-select");
+
+    const passwordInput = document.getElementById("password-field");
+    const encInput = document.getElementById("enc-field");
+
+    // Add an event listener to the select element
+    authSelect.addEventListener("change", function () {
+        // Check if the selected value is "psk"
+        if (authSelect.value === "psk") {
+            // If "PSK" is selected, show the proper input fields
+            passwordInput.style = "";
+            encInput.style = "";
+        } else {
+            // If any other option is selected, hide the proper fields
+            passwordInput.style = "display:none";
+            encInput.style = "display:none";
+        }
+    });
+});
+</script>
+
+{%  endblock %}
