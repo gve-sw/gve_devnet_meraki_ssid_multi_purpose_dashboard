@@ -80,6 +80,7 @@ The remaining pages and workflows are summarized below.
 ![ssid_to_tag.png](IMAGES/ssid_to_tag.png)
 
 * Map SSIDs to AP's with a tag matching the name of the SSID. Once an organization and one or more networks are selected, AP's in the selected networks reveal their tags, and any SSID with a name matching the tag within the Meraki Org is applied to the AP.
+* You must select the SSID slot in each destination network (to avoid overwriting existing SSIDs by accident)
 
 **Note**: If multiple SSIDs share the same name, the SSID configuration in the first alphabetical network name will be applied (ex: ssid3 in 'Network A' over 'ssid3' in 'Network B')
 

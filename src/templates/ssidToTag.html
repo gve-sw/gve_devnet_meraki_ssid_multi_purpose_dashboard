@@ -57,7 +57,7 @@
             </div>
         </div>
         <!-- Middle Rail -->
-        <div class="col-xl-6 col-md-4">
+        <div class="col-xl-7 col-md-4">
             <div class="panel panel--loose panel--raised base-margin-bottom">
             <h2 class="subtitle">Current Mappings</h2>
             <div class="section">
@@ -70,6 +70,7 @@
                                 <th class="hidden-md-down">Enabled</th>
                                 <th class="hidden-md-down">Auth Mode</th>
                                 <th class="hidden-md-down">Destination Network Name</th>
+                                <th class="hidden-md-down">Destination SSID Slot</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -81,7 +82,7 @@
             </div>
         </div>
         <!-- Right Rail -->
-        <div class="col-xl-3 col-md-4">
+        <div class="col-xl-2 col-md-4">
             <div class="panel panel--loose panel--raised base-margin-bottom">
                 <h2 class="subtitle">Step 2: Synchronize Mappings</h2>
                 <div class="section">
@@ -187,9 +188,10 @@
             columnDefs: [
                 { width: '20%', targets: 0 },
                 { width: '25%', targets: 1 },
-                { width: '15%', targets: 2 },
-                { width: '15%', targets: 3 },
-                { width: '25%', targets: 4 }
+                { width: '10%', targets: 2 },
+                { width: '10%', targets: 3 },
+                { width: '25%', targets: 4 },
+                { width: '10%', targets: 5, orderable: false }
             ],
             createdRow: function(row, data, dataIndex) {
                 // Add a class or style to the leftmost cell in each row
@@ -220,14 +222,22 @@
                     // Clear existing table content
                     dataTable.clear()
 
+                    // Create SSID Drop Down
+                    var dropdownHtml = '<select>';
+                    for (var j = 1; j <= 16; j++) {
+                        dropdownHtml += '<option value="' + j + '"' + '>' + j + '</option>';
+                    }
+                    dropdownHtml += '</select>';
+
                     // Iterate through the data and append rows to the table
                     for (let i = 0; i < data.length; i++) {
                         dataTable.row.add([
                             (data[i].enabled ? '<span class="icon-wifi icon-size-20 half-margin-right text-success"></span>' : '<span class="icon-wifi icon-size-20 half-margin-right text-light"></span>') + data[i].ssid_name,
-                            data[i].source_network,
+                            '<span class="icon-ethernet icon-size-20 half-margin-right text-success"></span>' + data[i].source_network,
                             (data[i].enabled ? 'Yes' : 'No'),
                             data[i].authMode,
-                            '<span class="icon-ethernet icon-size-20 half-margin-right text-success"></span>' + data[i].dest_network
+                            '<span class="icon-ethernet icon-size-20 half-margin-right text-success"></span>' + data[i].dest_network,
+                            dropdownHtml
                         ]).draw(false); // 'draw' with 'false' to retain the current page
                     }
                     // Enable the submit button if data is returned
@@ -242,7 +252,7 @@
         $("#synchronizeButton").on("click", function (e) {
             e.preventDefault();  // Prevent the default form submission
 
-            // display loading panel
+            // Display loading panel
             var html = '<div class="progressbar" data-percentage="0" id="progressBar"><div class="progressbar__fill"></div><div class="progressbar__label">0%</div></div>';
             $('#loading-panel-2').html(html);
 
@@ -250,16 +260,33 @@
             updateProgressBar(0);
             setTimeout(checkProgress, 1000);
 
-            // Get selected values from the Chosen dropdown
-            var selectedOrg = $("#organizations_select").val();
-            var selectedNetworks = $(".network-select-col[id='" + selectedOrg + "-col'] #networks_select").val();
+            var ssid_slots = {}
+            // Iterate through the rows of the DataTable
+            $('#mappingTable').DataTable().rows().every(function (rowIdx, tableLoop, rowLoop) {
+                var ssidName = $(this.node()).find('td:eq(0)').text();
+                var ssidSlot = $(this.node()).find('td:eq(5) select').val(); // Get the SSID name from the first column
 
-            // Update the hidden inputs in the second form
-            $("input[name='organizations_select']").val(selectedOrg);
-            $("input[name='networks_select']").val(selectedNetworks);
+                // Add the selected value and SSID name to the object
+                ssid_slots[ssidName] = ssidSlot;
+            });
 
             // Submit the form
-            document.synchronize.submit();
+            $.ajax({
+                url: '/ssid_to_tag',
+                method: 'POST',
+                data: {
+                    form_data: $('#mappingForm').serialize(),
+                    ssid_slots: JSON.stringify(ssid_slots)
+                },
+                success: function(response) {
+                    // Handle success
+                    console.log(response);
+                },
+                error: function(error) {
+                    // Handle error
+                    console.error('Error submitting form', error);
+                }
+            });
         });
    })
 

@@ -322,15 +322,16 @@ def get_ap_ssids(org_id, net_id, ssids):
     return network_ssids
 
 
-def configure_net_ssids(net_id, ssid_config):
+def configure_net_ssids(net_id, ssid_config, ssid_slot):
     """
     Configure an SSID in the network
     :param net_id: Network ID
     :param ssid_config: SSID config to apply to the network
+    :param ssid_slot: which SSID to configure (slots 0-15)
     :return: Boolean value indicating whether the SSID was successfully configured
     """
     global display_errors
-    ssid_config["number"] = 3  # the SSID configured will always be the 4th SSID (0-based index)
+    ssid_config["number"] = ssid_slot - 1
     ssid_num = ssid_config.pop("number")
     try:
         response = dashboard.wireless.updateNetworkWirelessSsid(net_id, ssid_num, **ssid_config)
@@ -477,12 +478,15 @@ def ssid_to_tag():
         display_errors.clear()
 
         # Obtain selected org and selected network(s)
-        selected_org = request.form.get('organizations_select')
-        networks_list = request.form.get('networks_select')
-        networks_list = networks_list.split(',')
+        form_data = request.form.get('form_data')
+        form_data = parse_qs(form_data, keep_blank_values=True)
+
+        # Obtain SSID to slot Mapping table
+        ssid_to_slot = request.form.get('ssid_slots')
+        ssid_to_slot = json.loads(ssid_to_slot)
 
         # Get SSID to Tag Mapping Data (don't apply mappings yet!)
-        ssid_dict, network_to_ssids = ssid_to_tag_mapping(selected_org, networks_list)
+        ssid_dict, network_to_ssids = ssid_to_tag_mapping(form_data['organizations_select'][0], form_data['networks_select'])
 
         # Calculate progress increment (100 / length floored)
         progress_inc = 100 / float(sum(len(value) for value in network_to_ssids.values()))
@@ -491,8 +495,14 @@ def ssid_to_tag():
             logger.info(f"Configuring the SSIDs of the {networkIDtoNameMapping[net_id]} network")
             for ssid_name in network_to_ssids[net_id]:
                 ssid = ssid_dict[ssid_name]
+
+                # Get SSID Slot (otherwise default to slot 1)
+                ssid_slot = 1
+                if ssid_name in ssid_to_slot:
+                    ssid_slot = int(ssid_to_slot[ssid_name])
+
                 # Apply SSID to target network
-                configure_net_ssids(net_id, ssid)
+                configure_net_ssids(net_id, ssid, ssid_slot)
                 progress += progress_inc
 
         progress = 100
